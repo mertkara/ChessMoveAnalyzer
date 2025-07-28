@@ -36,7 +36,7 @@ private:
     std::string idx_to_square(int rank, int file) const;
     Move handle_promotion(char piece);
     Move handle_castling(bool kingside);
-    void find_piece(char piece, int toRank, int toFile, int& fromRank, int& fromFile);
+    bool find_piece(char piece, int toRank, int toFile, int& fromRank, int& fromFile);
     bool can_reach(char piece, int fr, int ff, int tr, int tf);
     bool isBlocked(int fr, int ff, int tr, int tf);
     bool isHardPinned(char piece, int fr, int ff, int tr, int tf);

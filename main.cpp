@@ -39,14 +39,31 @@ std::vector<std::string> parse_pgn(const std::string& filename) {
 }
 
 int main(int argc, char** argv) {
+    if(argc < 2)
+    {     
+        std::cout << "Missing PGN filename..." << std::endl;
+        return -1;
+    }
+    std::cout << "Reading PGN file..." << std::endl;
     auto moves = parse_pgn(argv[1]);
+    Board board;
+
+    for (const auto& move : moves) {
+        Move m = board.parse_san(move);
+        std::cout << "PGN: " << move << " - UCI: " << m.uci() << std::endl;
+    }
+    return 1;
+    std::cout << "Starting engine..." << std::endl;
 
     StockfishEngine engine("stockfish-windows-x86-64-avx2.exe");
-    if (!engine.start()) return 1;
+    if (!engine.start()) 
+    {
+        std::cout << "Couldn't start engine..." << std::endl;
+        return 1;
+    }
 
     std::string current_fen = "startpos";
     std::string movesStr = "";
-    Board board;
 
     //engine.send_command("position " + current_fen);
 

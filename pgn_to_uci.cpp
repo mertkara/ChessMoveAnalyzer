@@ -2,6 +2,7 @@
 #include <cctype>
 #include <cmath>
 #include <sstream>
+#include <iostream>
 
 // -------------------- Move --------------------
 std::string Move::uci() const {
@@ -31,8 +32,8 @@ void Board::reset() {
     epFile = -1;
 }
 
-char Board::get(int file, int rank) const { return board[rank][file]; }
-void Board::set(int file, int rank, char piece) { board[rank][file] = piece; }
+char Board::get(int rank, int file) const { return board[rank][file]; }
+void Board::set(int rank, int file, char piece) { board[rank][file] = piece; }
 
 int Board::file_to_idx(char f) { return f - 'a'; }
 int Board::rank_to_idx(char r) { return 8 - (r - '0'); }
@@ -90,20 +91,30 @@ Move Board::parse_san(const std::string& san) {
             fromFile = file_to_idx(santmp[0]);
     }
 
+    if(!whiteToMove) 
+        piece = std::tolower(piece);
 
-    find_piece(piece, toRank, toFile, fromRank, fromFile);
+    if( !find_piece(piece, toRank, toFile, fromRank, fromFile) ){
+        std::cout << "PNG problem, is it a valid PNG or a bug?" << std::endl;
+    }
+         
 
-    // Hamleyi uygula
+    // Make the move
     Move move;
     move.from = idx_to_square(fromRank, fromFile);
     move.to = idx_to_square(toRank, toFile);
     move.promotion = promotion;
 
     char movingPiece = get(fromRank, fromFile);
+
+    // en passant capture, then we dont automatically edit the captured pawns square so need to do it here
+    if( std::toupper(piece) == 'P' && get(toRank,toFile) == '.' && isCapture ) 
+        set(fromRank,toFile,'.');
+        
     set(fromRank, fromFile, '.');
     set(toRank, toFile, promotion ? promotion : movingPiece);
 
-    // En passant file güncelle
+    // En passant is possible in the next move, if so which file
     epFile = -1;
     if (std::toupper(piece) == 'P' && std::abs(toRank - fromRank) == 2)
         epFile = fromFile;
@@ -145,7 +156,7 @@ Move Board::handle_castling(bool kingside) {
     return move;
 }
 
-void Board::find_piece(char piece, int toRank, int toFile, int& fromRank, int& fromFile) {  
+bool Board::find_piece(char piece, int toRank, int toFile, int& fromRank, int& fromFile) {  
     char p;
     for (int r = 0; r < 8; r++) {
         if( fromRank > 0 && r != fromRank ) continue;
@@ -158,13 +169,21 @@ void Board::find_piece(char piece, int toRank, int toFile, int& fromRank, int& f
                 continue;                
             else
             {
-                //hard pin is possible so need to check that
-
-                fromRank = r;
-                fromFile = f;
+                //seems like a legal move, but hard pin is possible so need to check that
+                //exp: 2 knight might go to same place, one is pinned, then source rank/file is not given in pgn as it is not a legal move...
+                if(isHardPinned(piece, r, f, toRank, toFile))
+                    continue;
+                else
+                { 
+                    //found the source square
+                    fromRank = r;
+                    fromFile = f;
+                    return true;
+                }
             }
         }
     }
+    return false;
 }
 
 bool Board::can_reach(char piece, int fr, int ff, int tr, int tf) {
@@ -186,21 +205,24 @@ bool Board::can_reach(char piece, int fr, int ff, int tr, int tf) {
         }
         else
         {
-            return (whiteToMove ? (dr == -1) : (dr == 1) ) && (std::abs(df) == 1) || 
+            return ((whiteToMove ? (dr == -1) : (dr == 1) ) && (std::abs(df) == 1)) || 
                 ((epFile >= 0) && (std::abs(df) == 1) && (whiteToMove ? (fr == rank_to_idx('5')) : (fr == rank_to_idx('4')))); 
         }
     case 'N': return dr * dr + df * df == 5;
     case 'B': return (std::abs(dr) == std::abs(df)) && !isBlocked(fr,ff,tr,tf);
     case 'R': return (dr == 0 || df == 0) && !isBlocked(fr,ff,tr,tf);
     case 'Q': return (dr == 0 || df == 0 || std::abs(dr) == std::abs(df)) && !isBlocked(fr,ff,tr,tf);
-    case 'K': return true; //only 1 king so assuming pgn is correct... std::max(std::abs(dr), std::abs(df)) == 1;
+    case 'K': return true; //only 1 king so assuming pgn is correct, its a legal move.
     }
     return false;
 }
 
 bool Board::isHardPinned(char piece, int fr, int ff, int tr, int tf){
-    char boardTmp[8][8];
+    if(std::toupper(piece) == 'K') return false;
+    char boardTmp[8][8]; //just to use can_reach function, editing member array board instead of tmp, and then use tmp to reverse it. 
+                         //for now it was easier, would probably change it later...
     int kingRank, kingFile;
+    bool pinned = false;
     for (int r = 0; r < 8; r++){
         for (int f = 0; f < 8; f++){
             boardTmp[r][f] = board[r][f];
@@ -220,24 +242,19 @@ bool Board::isHardPinned(char piece, int fr, int ff, int tr, int tf){
     if( std::toupper(piece) == 'P' && boardTmp[tr][tf] == '.' && isCapture ) // en passant
         board[fr][tf] = '.';
     
-    if(whiteToMove){
-        for (int r = 0; r < 8; r++){
-            for (int f = 0; f < 8; f++){
-                char p = board[r][f];
-                if(  p == 'q' || p == 'b' || p == 'r'  )
-                    if(can_reach(p,r,f,kingRank, kingFile)) return true;  
-            }
+    for (int r = 0; r < 8; r++){
+        for (int f = 0; f < 8; f++){
+            char p = board[r][f];
+            if( whiteToMove && (p == 'q' || p == 'b' || p == 'r') && can_reach(p,r,f,kingRank, kingFile) )
+                pinned = true;
+            else if( !whiteToMove && (p == 'Q' || p == 'B' || p == 'R') && can_reach(p,r,f,kingRank, kingFile) )
+                pinned = true;
+            if(pinned) break;
         }
-    }else{
-        for (int r = 0; r < 8; r++){
-            for (int f = 0; f < 8; f++){
-                char p = board[r][f];
-                if(  p == 'Q' || p == 'B' || p == 'R'  )
-                    if(can_reach(p,r,f,kingRank, kingFile)) return true;  
-            }
-        }
+        if(pinned) break;  
     }
-    return false;
+    std::copy(&boardTmp[0][0], &boardTmp[0][0] + 8*8, &board[0][0]);
+    return pinned;
 }
 
 bool Board::isBlocked(int fr, int ff, int tr, int tf) {
@@ -255,7 +272,7 @@ bool Board::isBlocked(int fr, int ff, int tr, int tf) {
     else if(df == 0)
     {
         for(int r = std::min(tr,fr)+1; r < std::max(tr,fr); r++ ){
-            p = get(tr,tf);
+            p = get(r,tf);
             if(p != '.') return true;
         }
     }
@@ -264,7 +281,7 @@ bool Board::isBlocked(int fr, int ff, int tr, int tf) {
         int rChange = ( dr > 0 ) ? 1 : -1; 
         int fChange = ( df > 0 ) ? 1 : -1;
         for(int i = 1; i < std::abs(dr); i++){
-            p = get(tr + i*rChange, tf + i*fChange);
+            p = get(fr + i*rChange, ff + i*fChange);
             if(p != '.') return true;
         }
     }
