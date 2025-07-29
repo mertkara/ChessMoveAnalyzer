@@ -63,11 +63,10 @@ std::string StockfishEngine::read_output(MoveEvaluation* eval) {
 
     while (true) {
         if (!ReadFile(hChildStdoutRead, buffer, sizeof(buffer) - 1, &bytesRead, NULL) || bytesRead == 0){
-            std::cout << "Stockfish output okuma hatası!" << std::endl;
+            std::cout << "Stockfish output read error!" << std::endl;
             break;
-        }else{
-            //std::cout << "Stockfish output okundu: " << bytesRead << " bayt: " << buffer << std::endl;
         }
+        if (bytesRead == 0) break; // EOF
         buffer[bytesRead] = '\0';
         output += buffer;
 
@@ -84,6 +83,14 @@ std::string StockfishEngine::read_output(MoveEvaluation* eval) {
                 size_t space1 = line.find(" ");
                 if (space1 != std::string::npos) {
                     size_t space2 = line.find(" ", space1 + 1);
+                    if (space2 == std::string::npos) {
+                        //eval->best_move = line.substr(space1+1);
+                        
+                        //eval->best_move = line.substr(space1 + 1); 
+                        //std::cout << "DEBUG"; //<< line ; //<<", space 1: " << space1 << std::endl;
+                        return output; 
+                        break;
+                    }
                     eval->best_move = line.substr(space1 + 1, space2 - (space1 + 1));
 
                     size_t ponderPos = line.find("ponder");
@@ -104,15 +111,19 @@ MoveEvaluation StockfishEngine::evaluate_move(const std::string& fen, std::strin
 
     // Hamleyi uygula ve hesaplat
     send_command("position startpos moves" + move);
-    send_command("go depth 5");
+    send_command("go depth 9");
 
     std::string output = read_output(&eval);
     //std::cout << "Stockfish output:\n" << output << std::endl;
 
     // Eval CP değeri
     eval.eval_cp = 0;
-    size_t scorePos = output.find("score cp ");
-    if (scorePos != std::string::npos) {
+    eval.mate_in = 0;
+    size_t matePos = output.rfind("score mate ");
+    size_t scorePos = output.rfind("score cp ");
+    if(matePos != std::string::npos) {
+        eval.mate_in = std::stoi(output.substr(matePos + 11));
+    } else if (scorePos != std::string::npos) {
         eval.eval_cp = std::stoi(output.substr(scorePos + 9));
     }
 

@@ -9,6 +9,7 @@ struct MoveEvaluation {
     std::string fen_after;         // Hamleden sonraki FEN
     std::string best_move;         // Stockfish'in önerdiği en iyi hamle
     std::string ponder_move;       // Opsiyonel ponder hamlesi
+    int mate_in;
 };
 
 class StockfishEngine {
