@@ -67,17 +67,27 @@ int main(int argc, char** argv) {
     std::string current_fen = "startpos";
     std::string movesStr = "";
 
+    int moveIndex = 0;
+    bool whiteToMove = true;
     for (const auto& move : moves) {
         Move m = board.parse_san(move);
         movesStr += " " + m.uci();
-        
+        if(whiteToMove) moveIndex++;
+
         auto result = engine.evaluate_move(current_fen, movesStr);
-        std::cout << m.uci() 
-                << " eval: " << result.eval_cp 
-                << " mate_in :" << result.mate_in
-                << " BestMove : " << result.best_move 
-                << " Ponder Move: " << result.ponder_move
-                << std::endl;
+        
+        std::string concatStr = "";
+        concatStr += std::to_string(moveIndex) + ": ";
+        concatStr += m.uci();
+        if( result.mate_in == 0 ) 
+            concatStr += " -> Eval: " + std::to_string(whiteToMove ? 0-result.eval_cp : result.eval_cp);
+        else
+            concatStr += " -> Mate in: " + std::to_string(whiteToMove ? 0-result.mate_in : result.mate_in);
+        concatStr += " Best Move: " + result.best_move; 
+        concatStr += ", Ponder Move: " + result.ponder_move;
+
+        std::cout << concatStr << std::endl;
+        whiteToMove = !whiteToMove;
     }
 
     engine.stop();

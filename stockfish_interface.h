@@ -18,10 +18,11 @@ public:
     bool start();
     void stop();
     void send_command(const std::string& cmd);
-    std::string read_output(MoveEvaluation* eval = nullptr);
-    MoveEvaluation evaluate_move(const std::string& fen, std::string move);
+    void read_uci_output(MoveEvaluation* eval = nullptr);
+    MoveEvaluation evaluate_move(const std::string& fen, std::string moves);
 
 private:
+    std::string output_buffer_; // Buffer for incomplete lines from stdout
     std::string engine_path;
     HANDLE hChildStdinWrite = NULL;
     HANDLE hChildStdoutRead = NULL;
