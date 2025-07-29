@@ -80,7 +80,7 @@ int main(int argc, char** argv) {
         concatStr += std::to_string(moveIndex) + ": ";
         concatStr += m.uci();
         if( result.mate_in == 0 ) 
-            concatStr += " -> Eval: " + std::to_string(whiteToMove ? 0-result.eval_cp : result.eval_cp);
+            concatStr += " -> Eval: " + std::to_string( (whiteToMove ? 0-result.eval_cp : result.eval_cp)/100.0 ).substr(0,3); //for now, why not
         else
             concatStr += " -> Mate in: " + std::to_string(whiteToMove ? 0-result.mate_in : result.mate_in);
         concatStr += " Best Move: " + result.best_move; 
